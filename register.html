@@ -1,0 +1,108 @@
+<!doctype html>
+<html class="no-js" lang="">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Velocicast sso proof of concept">
+  <title>Velocicast SSO - registration</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+  <link rel="stylesheet" href="css/main.css">
+
+</head>
+<body>
+    <section class="user-registration">
+        <h1>User Registration</h1>
+        <form id="registrationForm">
+            <input type="text" id="username" placeholder="Username" pattern=".*" required>
+            <input type="email" id="email" placeholder="Email" pattern=".*" required>
+            <input type="text" id="first-name" placeholder="First Name" pattern=".*" required>
+            <input type="text" id="last-name" placeholder="Last Name" pattern=".*" required>
+            <input type="password" id="password" placeholder="Password" pattern=".*" required>
+            <input type="password" id="password2" placeholder="Confirm Password" pattern=".*" required>
+            <input type="text" id="favorite-color" placeholder= "Your Favorite Color" pattern=".*"/>
+            <input class="register-btn btn" type="submit" value="register">
+        </form>
+    </section>
+    <script src="js/vendor/aws-cognito-sdk.min.js"></script>
+    <script src="js/vendor/amazon-cognito-identity.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.10/lodash.min.js"></script>-->
+    <script type=module src="js/main.js"></script>
+    <script>
+        window.addEventListener("load", function(event) {
+            /*global Larry*/
+            let registrationFormElem = document.querySelector("#registrationForm");
+            let passElem = registrationFormElem.querySelector('#password');
+            let pass2Elem = registrationFormElem.querySelector('#password2');
+            
+            /**************************************************************************************/
+            /*START RENDER METHODS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END RENDER METHODS */
+            /*START HANDLER METHODS */
+            /**************************************************************************************/
+            function displayMessage(title,contents){
+                document.body.innerHTML=`
+                    <h1>${title}<h1>
+                `;
+                let contentsElem = document.createElement('div');
+                contentsElem.innerHTML = contents;
+                document.body.appendChild(contentsElem);
+            }
+            function syncRegistrationActionableState (){
+                let registerBtnElem = registrationFormElem.querySelector('.register-btn');
+                if(passElem.value && pass2Elem.value && passElem.value === pass2Elem.value){
+                    registerBtnElem.disabled = false;
+                }
+                else{
+                    registerBtnElem.disabled = true;
+                }
+            }
+            /**************************************************************************************/
+            /*END HANDLER METHODS */
+            /*START EVENT LISTENERS */
+            /**************************************************************************************/
+            //setup listeners for enabling/disabling registration button
+            syncRegistrationActionableState();
+            passElem.addEventListener("change",syncRegistrationActionableState);
+            pass2Elem.addEventListener("change",syncRegistrationActionableState);
+            
+            //setup listener for form submission
+            registrationFormElem.addEventListener("submit",(event)=>{
+                event.preventDefault();
+                let userName = registrationFormElem.querySelector('#username').value;
+                let email = registrationFormElem.querySelector('#email').value;
+                let firstName = registrationFormElem.querySelector('#first-name').value;
+                let lastName = registrationFormElem.querySelector('#last-name').value;
+                let favoriteColor = registrationFormElem.querySelector('#favorite-color').value;
+                let password = passElem.value;
+                let password2 = pass2Elem.value;
+                
+            
+                //submit the registration to cognito
+                let userPool = new Larry._classes.CognitoUserPool(null,Larry._config.cognito);
+                userPool.register(userName, password, {
+                    name: firstName,
+                    family_name: lastName,
+                    email,
+                    
+                })
+                .then((result)=>{
+                    Larry._globalState._authenticatedUser = result.user;
+                    Larry._globalState._userPool = userPool;
+                    console.info("Registration Successfully Completed!!!!",Larry._globalState._authenticatedUser);
+                    displayMessage("Your Registration Is Being Processed",`<p>The next step is to verify your email. Please check your email inbox or spam folder for your verification link.</p>`);
+                })
+                .catch((e)=>{
+                    console.error("Registration Failed!!!!",e);
+                    displayMessage("Registration Failed",`<pre>${JSON.stringify(e,null,'\t')}</pre>`);
+                });
+            });
+            /**************************************************************************************/
+            /*END EVENT LISTENERS */
+            /**************************************************************************************/
+        });
+    </script>
+</body>
+</html>
