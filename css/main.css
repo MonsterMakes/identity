@@ -4,7 +4,25 @@ html {
 body{
     padding: 1rem;
 }
-pre,
-p{
+/**************************************************/
+/* START .modal-userfeedback */
+/**************************************************/
+.modal-userfeedback{
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #FFF;
+    padding: 1rem;
+}
+.modal-userfeedback.error{
+    background-color: lightpink;
+}
+.modal-userfeedback pre,
+.modal-userfeedback p{
     font-size: 1.4rem;
 }
+/**************************************************/
+/* END .modal-userfeedback */
+/**************************************************/

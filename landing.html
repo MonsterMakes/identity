@@ -1,0 +1,89 @@
+<!doctype html>
+<html class="no-js" lang="">
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="Velocicast sso proof of concept">
+    <title>Velocicast SSO - login</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+    <link rel="stylesheet" href="css/main.css">
+    <style type="text/css">
+        p{
+            font-size: 1.4rem;
+        }    
+    </style>
+</head>
+<body>
+    <section class="landing-page">
+        <p>Loading...</p>
+    </section>
+    <script src="js/vendor/aws-cognito-sdk.min.js"></script>
+    <script src="js/vendor/amazon-cognito-identity.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.10/lodash.min.js"></script>-->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script type=module src="js/main.js"></script>
+    <script>
+        window.addEventListener("load", function(event) {
+            /*global Larry*/
+            /*global axios*/
+            let mainContentElem = document.querySelector(".landing-page");
+            
+            Larry.ui.userFeedback.displayMessage(`<span style="font-size:1.4rem;">Loading...</span>`,``);
+            Larry.verifyAuthenticatedUser()
+                .then(()=>{
+                    let userPool = Larry.getSessionUserPool();
+                    userPool.retrieveAuthToken()
+                        .then((jwt)=>{
+                            Larry.ui.userFeedback.hideMessage();
+                            mainContentElem.innerHTML = `
+                                <p>Kick back and celebrate you earned it!!!!</p>
+                                <p>Here is your JWT: <pre>${jwt}</pre></p>
+                                <a class="btn echo-request">Send Echo Request</a>
+                                <a class="btn" href="/logout.html">Logout</a>
+                            `;
+                            let echoRequestBtnElem = mainContentElem.querySelector(".echo-request");
+                            echoRequestBtnElem.addEventListener("click",()=>{
+                                let requestor = axios.create({
+                                    baseURL: Larry._config.api.apiRootUrl,
+                                    headers: {'Authorization': jwt}
+                                });
+                                requestor.post('/echo', {
+                                    tokenToSend: jwt
+                                })
+                                .then(function (response) {
+                                    Larry.ui.userFeedback.displayMessage("Echo Request Complete",`<pre>${JSON.stringify(response.data,null,'\t')}</pre>`);
+                                })
+                                .catch(function (error) {
+                                    Larry.ui.userFeedback.displayErrorMessage("Echo Request Failed",`<pre>${JSON.stringify(error,null,'\t')}</pre>`);
+                                });
+                            });
+                        });        
+                })
+                .catch(()=>{
+                    mainContentElem.innerHTML = `
+                        <p>Redirecting...</p>
+                    `;
+                })
+            
+            
+            /**************************************************************************************/
+            /*START RENDER METHODS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END RENDER METHODS */
+            /*START HANDLER METHODS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END HANDLER METHODS */
+            /*START EVENT LISTENERS */
+            /**************************************************************************************/
+           
+            /**************************************************************************************/
+            /*END EVENT LISTENERS */
+            /**************************************************************************************/
+        });
+    </script>
+</body>
+</html>

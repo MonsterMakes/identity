@@ -13,13 +13,13 @@
     <section class="user-registration">
         <h1>User Registration</h1>
         <form id="registrationForm">
-            <input type="text" id="username" placeholder="Username" pattern=".*" required>
-            <input type="email" id="email" placeholder="Email" pattern=".*" required>
-            <input type="text" id="first-name" placeholder="First Name" pattern=".*" required>
-            <input type="text" id="last-name" placeholder="Last Name" pattern=".*" required>
-            <input type="password" id="password" placeholder="Password" pattern=".*" required>
-            <input type="password" id="password2" placeholder="Confirm Password" pattern=".*" required>
-            <input type="text" id="favorite-color" placeholder= "Your Favorite Color" pattern=".*"/>
+            <input type="text" id="username" placeholder="Username" pattern=".*" required autocomplete="username" />
+            <input type="email" id="email" placeholder="Email" pattern=".*" required autocomplete="email" />
+            <input type="text" id="first-name" placeholder="First Name" pattern=".*" required autocomplete="given-name" />
+            <input type="text" id="last-name" placeholder="Last Name" pattern=".*" required autocomplete="family-name" />
+            <input type="password" id="password" placeholder="Password" pattern=".*" required autocomplete="new-password" />
+            <input type="password" id="password2" placeholder="Confirm Password" pattern=".*" required autocomplete="new-password" />
+            <input type="text" id="favorite-color" placeholder= "Your Favorite Color" pattern=".*" />
             <input class="register-btn btn" type="submit" value="register">
         </form>
     </section>
@@ -30,6 +30,12 @@
     <script>
         window.addEventListener("load", function(event) {
             /*global Larry*/
+            let userPool = Larry.getSessionUserPool();
+            let cognitoUser = userPool.getCurrentUser();
+            //add a message to the console if you are already logged in.
+            if (cognitoUser) {
+                console.info("You are registering a user but are already logged in... FYI",cognitoUser);
+            };
             let registrationFormElem = document.querySelector("#registrationForm");
             let passElem = registrationFormElem.querySelector('#password');
             let pass2Elem = registrationFormElem.querySelector('#password2');
@@ -42,14 +48,6 @@
             /*END RENDER METHODS */
             /*START HANDLER METHODS */
             /**************************************************************************************/
-            function displayMessage(title,contents){
-                document.body.innerHTML=`
-                    <h1>${title}<h1>
-                `;
-                let contentsElem = document.createElement('div');
-                contentsElem.innerHTML = contents;
-                document.body.appendChild(contentsElem);
-            }
             function syncRegistrationActionableState (){
                 let registerBtnElem = registrationFormElem.querySelector('.register-btn');
                 if(passElem.value && pass2Elem.value && passElem.value === pass2Elem.value){
@@ -81,22 +79,21 @@
                 
             
                 //submit the registration to cognito
-                let userPool = new Larry._classes.CognitoUserPool(null,Larry._config.cognito);
                 userPool.register(userName, password, {
                     name: firstName,
                     family_name: lastName,
                     email,
-                    
+                    "custom:favorite-color": favoriteColor
                 })
                 .then((result)=>{
                     Larry._globalState._authenticatedUser = result.user;
                     Larry._globalState._userPool = userPool;
                     console.info("Registration Successfully Completed!!!!",Larry._globalState._authenticatedUser);
-                    displayMessage("Your Registration Is Being Processed",`<p>The next step is to verify your email. Please check your email inbox or spam folder for your verification link.</p>`);
+                    Larry.ui.userFeedback.displayMessage("Your Registration Is Being Processed",`<p>The next step is to verify your email. Please check your email inbox or spam folder for your verification link.</p>`);
                 })
                 .catch((e)=>{
                     console.error("Registration Failed!!!!",e);
-                    displayMessage("Registration Failed",`<pre>${JSON.stringify(e,null,'\t')}</pre>`);
+                    Larry.ui.userFeedback.displayMessage("Registration Failed",`<pre>${JSON.stringify(e,null,'\t')}</pre>`);
                 });
             });
             /**************************************************************************************/

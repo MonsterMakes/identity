@@ -49,7 +49,7 @@ class CognitoUserPool{
         });
     }
 
-    signin(username, password) {
+    signIn(username, password) {
         let authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
             Username: username,
             Password: password
@@ -66,6 +66,23 @@ class CognitoUserPool{
                 onFailure: reject
             });
         });
+    }
+
+    signOut(globally){
+        if(globally){
+            return new Promise((resolve,reject)=>{
+                this._userPool.getCurrentUser().globalSignOut({
+                    onSuccess: resolve,
+                    onFailure: reject
+                });
+            }); 
+        }
+        else {
+            return Promise.resolve()
+                .then(()=>{
+                    this._userPool.getCurrentUser().signOut();
+                });
+        }
     }
 
     verify(username, code) {
@@ -91,28 +108,49 @@ class CognitoUserPool{
     getCurrentUser(){
          return this._userPool.getCurrentUser();
     }
-    /**
-     * RetrieveAuthToken
-     * @returns {Promise<jwt>} Returns a Promise that is resolved with a jwt token if valid session or null otehrwise.
-     */
-    retrieveAuthToken(){
+    getCurrentUserSession(){
         return new Promise((resolve, reject)=>{
-            var cognitoUser = this._userPool.getCurrentUser();
+            let cognitoUser = this._userPool.getCurrentUser();
         
             if (cognitoUser) {
                 cognitoUser.getSession((err, session)=>{
                     if (err) {
                         reject(err);
-                    } else if (!session.isValid()) {
-                        resolve(null);
-                    } else {
-                        resolve(session.getIdToken().getJwtToken());
+                    }
+                    else{
+                        resolve(session);
                     }
                 });
-            } else {
-                resolve(null);
+            } 
+            else {
+                reject(null);
             }
         });
+    }
+    isCurrentUserSessionValid(){
+        return this.getCurrentUserSession()
+            .then((session)=>{
+                if (session.isValid()) {
+                    return Promise.resolve();
+                }
+                else{
+                    return Promise.reject();
+                }
+            });
+    }
+    /**
+     * RetrieveAuthToken
+     * @returns {Promise<jwt>} Returns a Promise that is resolved with a jwt token if valid session or null otehrwise.
+     */
+    retrieveAuthToken(){
+        return this.getCurrentUserSession()
+            .then((session)=>{
+                if (!session.isValid()) {
+                    return Promise.resolve(null);
+                } else {
+                    return Promise.resolve(session.getIdToken().getJwtToken());
+                }
+            });
     }
 }
 export default CognitoUserPool;

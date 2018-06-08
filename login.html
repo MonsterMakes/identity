@@ -13,10 +13,13 @@
     <section class="user-login">
         <h1>User Login</h1>
         <form id="loginForm">
-            <input type="text" id="username" placeholder="Username" pattern=".*" required>
-            <input type="password" id="password" placeholder="Password" pattern=".*" required>
+            <input type="text" id="username" placeholder="Username" pattern=".*" required autocomplete="username" />
+            <input type="password" id="password" placeholder="Password" pattern=".*" required autocomplete="current-password" />
             <input class="login-btn btn" type="submit" value="login">
         </form>
+        <p>
+            <a href="reset-password.html">Forgot Password?</a> | <a href="register.html">Create Account</a>
+        </p>
     </section>
     <script src="js/vendor/aws-cognito-sdk.min.js"></script>
     <script src="js/vendor/amazon-cognito-identity.min.js"></script>
@@ -25,26 +28,19 @@
     <script>
         window.addEventListener("load", function(event) {
             /*global Larry*/
+            let userPool = Larry.getSessionUserPool();
             let loginFormElem = document.querySelector("#loginForm");
             let usernameElem = loginFormElem.querySelector('#username');
             let passElem = loginFormElem.querySelector('#password');
             
             /**************************************************************************************/
-            /*START RENDER METHODS */
+            /* START RENDER METHODS */
             /**************************************************************************************/
             
             /**************************************************************************************/
-            /*END RENDER METHODS */
-            /*START HANDLER METHODS */
+            /* END RENDER METHODS */
+            /* START HANDLER METHODS */
             /**************************************************************************************/
-            function displayMessage(title,contents){
-                document.body.innerHTML=`
-                    <h1>${title}<h1>
-                `;
-                let contentsElem = document.createElement('div');
-                contentsElem.innerHTML = contents;
-                document.body.appendChild(contentsElem);
-            }
             function syncLoginBtnActionableState(){
                 let loginBtnElem = loginFormElem.querySelector('.login-btn');
                 if(passElem.value && usernameElem.value){
@@ -54,46 +50,51 @@
                     loginBtnElem.disabled = true;
                 }
             };
+            function loginSuccessful(userPool){
+                Larry._globalState._authenticatedUser = userPool.getCurrentUser();
+                
+                window.location.href = "/landing.html";
+            }
             /**************************************************************************************/
-            /*END HANDLER METHODS */
-            /*START EVENT LISTENERS */
+            /* END HANDLER METHODS */
+            /* START EVENT LISTENERS */
+            /**************************************************************************************/
+            //setup listener for form submission
+            loginFormElem.addEventListener("submit",(event)=>{
+                event.preventDefault();
+                let userName = usernameElem.value;
+                let password = passElem.value;
+        
+                //submit the registration to cognito
+                userPool.signIn(userName, password)
+                    .then((result)=>{
+                        console.info("Login Successfully Completed!!!!",Larry._globalState._authenticatedUser);
+                        loginSuccessful(userPool);
+                    })
+                    .catch((e)=>{
+                        console.error("Login Failed!!!!",e);
+                        Larry.ui.userFeedback.displayMessage("Login Failed",`<p>Did you type things in correctly???</p><p>Here is the error info:</p><pre>${JSON.stringify(e,null,'\t')}</pre>`);
+                    });
+            });
+            /**************************************************************************************/
+            /* END EVENT LISTENERS */
+            /* START MAIN SCRIPT */
             /**************************************************************************************/
             //setup listeners for enabling/disabling registration button
             syncLoginBtnActionableState();
             usernameElem.addEventListener("change",syncLoginBtnActionableState);
             passElem.addEventListener("change",syncLoginBtnActionableState);
             
-            //setup listener for form submission
-            loginFormElem.addEventListener("submit",(event)=>{
-                event.preventDefault();
-                let userName = usernameElem.value;
-                let password = passElem.value;
-                
-            
-                //submit the registration to cognito
-                let userPool = new Larry._classes.CognitoUserPool(null,Larry._config.cognito);
-                userPool.signin(userName, password)
-                    .then((result)=>{
-                        Larry._globalState._authenticatedUser = userPool.getCurrentUser();
-                        Larry._globalState._userPool = userPool;
-                        console.info("Login Successfully Completed!!!!",Larry._globalState._authenticatedUser);
-                        userPool.retrieveAuthToken()
-                            .then((jwt)=>{
-                                displayMessage("Login Successful",`
-                                <p>Kick back and celebrate you earned it!!!!</p>
-                                <p>Here is your JWT: <pre>${jwt}</pre></p>
-                                `);        
-                            })
-                        
-                    })
-                    .catch((e)=>{
-                        console.error("Login Failed!!!!",e);
-                        displayMessage("Login Failed",`<p>Did you type things in correctly???</p><p>Here is the error info:</p><pre>${JSON.stringify(e,null,'\t')}</pre>`);
-                    });
-            });
-            /**************************************************************************************/
-            /*END EVENT LISTENERS */
-            /**************************************************************************************/
+            //if the user is already logged in 
+            userPool.isCurrentUserSessionValid()
+                .then(()=>{
+                    let loggedInUser = userPool.getCurrentUser();
+                    console.info("User already logged in, redirecting to landing...",loggedInUser);
+                    loginSuccessful(userPool);
+                })
+                .catch(()=>{
+                    //all good do nothing
+                });
         });
     </script>
 </body>
