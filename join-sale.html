@@ -1,0 +1,29 @@
+<!doctype html>
+<html class="no-js" lang="">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Velocicast sso proof of concept">
+  <title>Velocicast SSO</title>
+</head>
+<body>
+  <script src="/js/thirdparty/aws-amplify.js"></script>
+  <script type=module src="js/main.js"></script>
+  <script>
+    window.addEventListener("load", function(event) {
+      /*global Larry*/
+      const { 
+        domain,  
+        redirectSignIn, 
+        redirectSignOut,
+        responseType 
+      } = Larry._config.cognito.oauth;
+  
+      const clientId = Larry._config.cognito.userPoolWebClientId;
+      const url = 'https://' + domain + '/login?redirect_uri=' + redirectSignIn + '&response_type=' + responseType + '&client_id=' + clientId;
+  
+      // Launch hosted UI
+      window.location.assign(url);
+    });
+  </script>
+</body>
+</html>

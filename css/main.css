@@ -19,6 +19,10 @@ body{
 .modal-userfeedback.error{
     background-color: lightpink;
 }
+.modal-userfeedback pre{
+    overflow: auto;
+    white-space: pre-wrap;
+}
 .modal-userfeedback pre,
 .modal-userfeedback p{
     font-size: 1.4rem;

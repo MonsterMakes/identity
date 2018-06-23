@@ -3,73 +3,159 @@
 <head>
     <meta charset="utf-8">
     <meta name="description" content="Velocicast sso proof of concept">
-    <title>Velocicast SSO - login</title>
+    <title>Velocicast SSO - Landing</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
     <link rel="stylesheet" href="css/main.css">
     <style type="text/css">
         p{
             font-size: 1.4rem;
-        }    
+        }
+        pre{
+            font-size: 1.2rem;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+        .action{
+            display: inline-block;
+            margin-right: 1.5rem;
+        }
+        .action:last-child{
+            margin-right: 0;
+        }
     </style>
 </head>
 <body>
     <section class="landing-page">
         <p>Loading...</p>
     </section>
-    <script src="js/vendor/aws-cognito-sdk.min.js"></script>
-    <script src="js/vendor/amazon-cognito-identity.min.js"></script>
-    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.10/lodash.min.js"></script>-->
+    <script src="/js/thirdparty/aws-amplify.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script type=module src="js/main.js"></script>
     <script>
         window.addEventListener("load", function(event) {
             /*global Larry*/
             /*global axios*/
+            /*global URLSearchParams*/
             let mainContentElem = document.querySelector(".landing-page");
             
             Larry.ui.userFeedback.displayMessage(`<span style="font-size:1.4rem;">Loading...</span>`,``);
-            Larry.verifyAuthenticatedUser()
-                .then(()=>{
-                    let userPool = Larry.getSessionUserPool();
-                    userPool.retrieveAuthToken()
-                        .then((jwt)=>{
-                            Larry.ui.userFeedback.hideMessage();
-                            mainContentElem.innerHTML = `
-                                <p>Kick back and celebrate you earned it!!!!</p>
-                                <p>Here is your JWT: <pre>${jwt}</pre></p>
-                                <a class="btn echo-request">Send Echo Request</a>
-                                <a class="btn" href="/logout.html">Logout</a>
-                            `;
-                            let echoRequestBtnElem = mainContentElem.querySelector(".echo-request");
-                            echoRequestBtnElem.addEventListener("click",()=>{
-                                let requestor = axios.create({
-                                    baseURL: Larry._config.api.apiRootUrl,
-                                    headers: {'Authorization': jwt}
-                                });
-                                requestor.post('/echo', {
-                                    tokenToSend: jwt
-                                })
-                                .then(function (response) {
-                                    Larry.ui.userFeedback.displayMessage("Echo Request Complete",`<pre>${JSON.stringify(response.data,null,'\t')}</pre>`);
-                                })
-                                .catch(function (error) {
-                                    Larry.ui.userFeedback.displayErrorMessage("Echo Request Failed",`<pre>${JSON.stringify(error,null,'\t')}</pre>`);
-                                });
-                            });
-                        });        
-                })
-                .catch(()=>{
-                    mainContentElem.innerHTML = `
-                        <p>Redirecting...</p>
-                    `;
-                })
-            
-            
+            //check for an oauth2 error 
+            //for some reason Cognito is passing errors in the hashbang when using the token response_type and query params when using the code response_type, so we will look in both...
+            function getCognitoParams(...paramNames){
+                let response = {};
+                let hashBangParams = new URLSearchParams(window.location.hash.substring(1));
+                let queryParams = new URLSearchParams(window.location.search.substring(1));
+                
+                paramNames.forEach((param)=>{
+                    let hashVal = hashBangParams.get(param);
+                    let queryVal = queryParams.get(param);
+                    if(hashVal){
+                        response[param] = hashVal;
+                    }
+                    else if(queryVal){
+                        response[param] = queryVal;
+                    }
+                    
+                });
+                
+                //if the object is empty
+                if(Object.keys(response).length === 0 ){
+                    response = null;
+                }
+                return response;
+            }
+			let oauth2Error = getCognitoParams("error","error_description");
+			
+			if(oauth2Error){
+				Larry.ui.userFeedback.displayErrorMessage("Encountered an Oauth2 Error",`<p><span>${oauth2Error.error}</span> - ${oauth2Error.error_description}</p>`)
+			}
+			else{
+			    Larry.verifyAuthenticatedUser()
+                    .then(()=>{
+                        render();
+                    })
+                    .catch(()=>{
+                        mainContentElem.innerHTML = `
+                            <p>Redirecting...</p>
+                        `;
+                    });
+			}
             /**************************************************************************************/
             /*START RENDER METHODS */
             /**************************************************************************************/
-            
+            function render(){
+                let userPool = Larry.getCognitoUserPool();
+                return userPool.getCurrentUserSession()
+                    .then((cognitoUserSession)=>{
+                        Larry.ui.userFeedback.hideMessage();
+                        mainContentElem.innerHTML = ``;
+                        
+                        let idToken = cognitoUserSession.getIdToken();
+                        let accessToken = cognitoUserSession.getAccessToken();
+                        
+                        mainContentElem.appendChild(renderTokens(idToken,accessToken));
+                        mainContentElem.appendChild(renderEchoAction(accessToken.getJwtToken()));
+                        mainContentElem.appendChild(renderLogoutAction());
+                        
+                    })
+                    .catch(function (error) {
+                        Larry.ui.userFeedback.displayErrorMessage("Unknown Error",`<pre>${JSON.stringify(error,null,'\t')}</pre>`);
+                    });
+            }
+            function renderTokens(idToken,accessToken){
+                let idJwtToken = idToken.getJwtToken();
+                let idJwtPayload = idToken.decodePayload();
+                let accessJwtToken = accessToken.getJwtToken();
+                let accessJwtPayload = accessToken.decodePayload();
+                
+                let tokenSectionElem = document.createElement('section');
+                tokenSectionElem.classList.add("tokens-section");
+                tokenSectionElem.innerHTML = `
+                    <p>Kick back and celebrate you earned it!!!!</p>
+                    <p>Here is your ID Token: 
+                        <pre>${idJwtToken}</pre>
+                        <pre>${JSON.stringify(idJwtPayload,null,'\t')}</pre>
+                    </p>
+                    <p>Here is your Access Token: 
+                        <pre>${accessJwtToken}</pre>
+                        <pre>${JSON.stringify(accessJwtPayload,null,'\t')}</pre>
+                    <p>
+                `;
+                return tokenSectionElem;
+            }
+            function renderEchoAction(accessJwtToken){
+                let elem = document.createElement('div');
+                elem.classList.add("action","echo-action");
+                elem.innerHTML = `
+                    <a class="btn echo-request">Send Echo Request</a>
+                `;
+                let echoRequestBtnElem = elem.querySelector(".echo-request");
+                echoRequestBtnElem.addEventListener("click",()=>{
+                    let requestor = axios.create({
+                        baseURL: Larry._config.api.apiRootUrl,
+                        headers: {'Authorization': accessJwtToken}
+                    });
+                    requestor.post('/echo', {
+                        "hello": "from team AF!"
+                    })
+                    .then(function (response) {
+                        Larry.ui.userFeedback.displayMessage("Echo Request Complete",`<pre>${JSON.stringify(response.data,null,'\t')}</pre><p>press escape to close</p>`);
+                    })
+                    .catch(function (error) {
+                        Larry.ui.userFeedback.displayErrorMessage("Echo Request Failed",`<pre>${JSON.stringify(error,null,'\t')}</pre>`);
+                    });
+                });
+                return elem;
+            }
+            function renderLogoutAction(){
+                let elem = document.createElement('div');
+                elem.classList.add("action","logout-action");
+                elem.innerHTML = `
+                    <a class="btn" href="/logout.html">Logout</a>
+                `;
+                return elem;
+            }
             /**************************************************************************************/
             /*END RENDER METHODS */
             /*START HANDLER METHODS */

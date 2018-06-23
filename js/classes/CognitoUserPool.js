@@ -1,131 +1,80 @@
 "use strict";
-/*global AWSCognito*/
-/*global AmazonCognitoIdentity*/
 
+const Amplify = window["aws-amplify"].API;
+const AmplifyAuth = window["aws-amplify"].AuthClass;
+
+/**
+ * TODO - global sign out
+ * TODO - update user attributes
+ * TODO - change password
+ * TODO - forgot password
+ */
 class CognitoUserPool{
-    constructor(userpool=undefined,config={}){
-        if(userpool){
-            this._userPool = this._userPool;
-        }
-        else{
-            //setup cognito
-            AWSCognito.config.region = config.region;
-            this._userPool = new AmazonCognitoIdentity.CognitoUserPool({
-                UserPoolId: config.userPoolId,
-                ClientId: config.userPoolClientId
-            });
-        }
+    constructor(config={}){
+        //setup cognito
+        this._auth = new AmplifyAuth(config);
     }
-    _getCognitoUserAttributes(userAttributesObj){
-        let attributeList = [];
-        
-        Object.keys(userAttributesObj).forEach((key)=>{
-            let attr = {
-                Name: key,
-                Value: userAttributesObj[key]
-            };
-            let cognitoAttr = new AmazonCognitoIdentity.CognitoUserAttribute(attr);
-            attributeList.push(cognitoAttr);
-        });
-        return attributeList;
-    }
-    /*
-     * Cognito User Pool functions
+   
+    /**
+     * Register a new user in the pool
      */
     register(username, password, userAttributes) {
         //TODO add error handling when user/pass not specified
-        let cognitoUserAttributes = this._getCognitoUserAttributes(userAttributes);
 
-        return new Promise((resolve,reject)=>{
-            this._userPool.signUp(username, password, cognitoUserAttributes, null,
-                (err, result)=>{
-                    if (!err) {
-                        resolve(result);
-                    } else {
-                        reject(err);
-                    }
-                }
-            );
+        return  this._auth.signUp({
+            username, 
+            password, 
+            attributes: userAttributes
+        });
+    }
+    
+    /**
+     * Confirm the newly registered user in the pool, via the code provided from the email
+     */
+    confirmRegistration(username,code){
+        // Collect confirmation code, then
+        return  this._auth.confirmSignUp(username, code, {
+            // Optional. Force user confirmation irrespective of existing alias. By default set to True.
+            forceAliasCreation: true    
         });
     }
 
+    /**
+     * Sign the user in 
+     */
     signIn(username, password) {
-        let authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
-            Username: username,
-            Password: password
-        });
-
-        let cognitoUser = new AmazonCognitoIdentity.CognitoUser({
-            Username: username,
-            Pool: this._userPool
-        });
-
-        return new Promise((resolve,reject)=>{
-            cognitoUser.authenticateUser(authenticationDetails, {
-                onSuccess: resolve,
-                onFailure: reject
-            });
-        });
+        return this._auth.signIn(username,password);
     }
 
-    signOut(globally){
-        if(globally){
-            return new Promise((resolve,reject)=>{
-                this._userPool.getCurrentUser().globalSignOut({
-                    onSuccess: resolve,
-                    onFailure: reject
-                });
-            }); 
-        }
-        else {
-            return Promise.resolve()
-                .then(()=>{
-                    this._userPool.getCurrentUser().signOut();
-                });
-        }
+    /**
+     * If MFA is enabled call this to provide the challenge
+     */
+    confirmSignIn(user,code,mfaType){
+        // If MFA is enabled, confirm user signing 
+        // `user` : Return object from Auth.signIn()
+        // `code` : Confirmation code  
+        // `mfaType` : MFA Type e.g. SMS, TOTP.
+        return this._auth.confirmSignIn(user, code, mfaType)
     }
 
-    verify(username, code) {
-        return new Promise((resolve,reject)=>{
-            let cognitoUser = new AmazonCognitoIdentity.CognitoUser({
-                Username: username,
-                Pool: this._userPool
-            });
-            
-            cognitoUser.confirmRegistration(code, true, (err, result)=>{
-                if (!err) {
-                    resolve(result);
-                } else {
-                    reject(err);
-                }
-            });    
-        })
-        
+    /**
+     * Sign out of the userpool "application"
+     */
+    signOut(){
+        return this._auth.signOut();
     }
+
     /**
      * Get the current user of this pool
      */
     getCurrentUser(){
-         return this._userPool.getCurrentUser();
+         return this._auth.currentUserPoolUser();
     }
+    /**
+     * @returns {CognitoUserSession} - The User session contianing the tokens
+     */
     getCurrentUserSession(){
-        return new Promise((resolve, reject)=>{
-            let cognitoUser = this._userPool.getCurrentUser();
-        
-            if (cognitoUser) {
-                cognitoUser.getSession((err, session)=>{
-                    if (err) {
-                        reject(err);
-                    }
-                    else{
-                        resolve(session);
-                    }
-                });
-            } 
-            else {
-                reject(null);
-            }
-        });
+        return this._auth.currentSession();
     }
     isCurrentUserSessionValid(){
         return this.getCurrentUserSession()
@@ -138,17 +87,34 @@ class CognitoUserPool{
                 }
             });
     }
-    /**
-     * RetrieveAuthToken
-     * @returns {Promise<jwt>} Returns a Promise that is resolved with a jwt token if valid session or null otehrwise.
-     */
-    retrieveAuthToken(){
+
+    retrieveIdToken(){
         return this.getCurrentUserSession()
             .then((session)=>{
                 if (!session.isValid()) {
                     return Promise.resolve(null);
                 } else {
-                    return Promise.resolve(session.getIdToken().getJwtToken());
+                    return Promise.resolve(session.getIdToken());
+                }
+            });
+    }
+    retrieveAccessToken(){
+        return this.getCurrentUserSession()
+            .then((session)=>{
+                if (!session.isValid()) {
+                    return Promise.resolve(null);
+                } else {
+                    return Promise.resolve(session.getAccessToken());
+                }
+            });
+    }
+    retrieveRefreshToken(){
+        return this.getCurrentUserSession()
+            .then((session)=>{
+                if (!session.isValid()) {
+                    return Promise.resolve(null);
+                } else {
+                    return Promise.resolve(session.getRefreshToken());
                 }
             });
     }

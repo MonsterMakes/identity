@@ -1,4 +1,5 @@
 "use strict";
+
 import CognitoUserPool from './classes/CognitoUserPool.js';
 
 window.Larry = {
@@ -9,11 +10,18 @@ window.Larry = {
         },
         cognito: {
             userPoolId: 'us-west-2_lYLXxamUc', 
-            userPoolClientId: '362hm9nhif3p9gkebfnfsstkvu',
-            region: 'us-west-2'
+            userPoolWebClientId: '362hm9nhif3p9gkebfnfsstkvu',
+            region: 'us-west-2',
+            oauth:{
+                domain: "oauth.web.sso.auctionfrontierdevelopment.com",
+                scope: ["email","openid","aws.cognito.signin.user.admin","profile"],
+                redirectSignIn: "https://web.sso.auctionfrontierdevelopment.com/landing.html",
+                redirectSignOut: "https://web.sso.auctionfrontierdevelopment.com/logout.html",
+                responseType: "token"
+            }
         },
         api: {
-            apiRootUrl: 'https://0kq9lpqrl8.execute-api.us-west-2.amazonaws.com/beta'
+            apiRootUrl: 'https://api.sso.auctionfrontierdevelopment.com/'
         }
     },
     _classes: {
@@ -25,11 +33,11 @@ window.Larry = {
     },
     ui:{
         userFeedback: {
-            _escapeKeyPressedEventListener: (function(event){
+            _escapeKeyPressedEventListener: function(event){
                 if (event.key === 'Escape' || event.keyCode === 27) {
                     this._destroyFeedback();
                 }
-            }).bind(this),
+            },
             _destroyFeedback: function(){
                 let existingModalElem = document.querySelector(".modal-userfeedback");
                 if(existingModalElem){
@@ -63,8 +71,8 @@ window.Larry = {
                 }
                 else{
                     this._modalDisplayed = true;
-                    this._modalKeyListener = (function(){
-                        this._destroyFeedback();
+                    this._modalKeyListener = (function(event){
+                        this._escapeKeyPressedEventListener(event);
                     }).bind(this);
                     
                     document.body.addEventListener("keydown",this._modalKeyListener);
@@ -87,7 +95,7 @@ window.Larry = {
      */
     signIn: function signIn(email, password){
         //TODO check if the user is already logged in
-        let pool = new this._classes.CognitoUserPool(null,this._config.cognito);
+        let pool = new this._classes.CognitoUserPool(this._config.cognito);
         return this._globalState._userPool.signIn(email,password)
             .then(()=>{
                 this._globalState._userPool = pool;
@@ -97,22 +105,26 @@ window.Larry = {
      * Global signout method
      */
     signOut: function signOut() {
-        let pool = this.getSessionUserPool();
+        let pool = this.getCognitoUserPool();
         return Promise.resolve()
             .then(()=>{
                 return pool.signOut();
             });
     },
-    getSessionUserPool: function(){
+    getCognitoUserPool: function(){
         if(this._globalState._userPool){
             return this._globalState._userPool;
         }
         else{
-            let userPool = new this._classes.CognitoUserPool(null,this._config.cognito);
-            let user = userPool.getCurrentUser();
-            if(user){
-                this._globalState._userPool = userPool;
-            }
+            let userPool = new this._classes.CognitoUserPool(this._config.cognito);
+            userPool.getCurrentUser()
+                .then((user)=>{
+                    if(user){
+                        this._globalState._userPool = userPool;
+                    }
+                })
+                .catch(()=>{/*do nothing*/});
+            
             return userPool;
         }
     },
@@ -120,7 +132,7 @@ window.Larry = {
      * Redirect the user to the login page if they are not logged in.
      */
     verifyAuthenticatedUser: function(){
-        let userPool = this.getSessionUserPool();
+        let userPool = this.getCognitoUserPool();
         return userPool.isCurrentUserSessionValid()
             .catch((e)=>{
                 window.location.href = "/login.html";    
@@ -128,27 +140,11 @@ window.Larry = {
             });
     },
     /**
-     * RetrieveAuthToken
-     * @returns {Promise<jwt>} Returns a Promise that is resolved with a jwt token if valid session or null otehrwise.
+     * @returns {Promise<jwt>} Returns a Promise that is resolved with a jwt token if valid session or null otherwise.
      */
-    retrieveAuthToken: function(){
-        return new Promise(function fetchCurrentAuthToken(resolve, reject) {
-            var cognitoUser = this._globalState._userPool.getCurrentUser();
-        
-            if (cognitoUser) {
-                cognitoUser.getSession(function sessionCallback(err, session) {
-                    if (err) {
-                        reject(err);
-                    } else if (!session.isValid()) {
-                        resolve(null);
-                    } else {
-                        resolve(session.getIdToken().getJwtToken());
-                    }
-                });
-            } else {
-                resolve(null);
-            }
-        });
+    retrieveIdToken: function(){
+        let userPool = this.getCognitoUserPool();
+        return userPool.retrieveIdToken();
     }
     /********************************************************/
     /* END GLOBAL METHODS */

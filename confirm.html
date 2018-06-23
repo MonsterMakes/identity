@@ -1,0 +1,76 @@
+<!doctype html>
+<html class="no-js" lang="">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Velocicast sso proof of concept">
+  <title>Velocicast SSO - registration</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0-beta/css/materialize.min.css">
+  <link rel="stylesheet" href="css/main.css">
+
+</head>
+<body>
+    <section class="user-registration">
+        <div class="modal-userfeedback">
+            <h1>Your Registration Has Been Processed</h1>
+            <div class="modal-userfeedback-contents"><p>You are being redirected to the login screen...</p></div>
+        </div>
+    </section>
+    <script src="/js/thirdparty/aws-amplify.js"></script>
+    <script type=module src="js/main.js"></script>
+    <script>
+        window.addEventListener("load", function(event) {
+            /*global Larry*/
+            /* URLSearchParams */
+            Larry.ui.userFeedback.displayMessage("Your Confirmation Is Being Processed",`<p>We are confirming your email with the system, please wait...</p>`);
+            let userPool = Larry.getCognitoUserPool();
+            //get username and code for query params
+            let params = new URLSearchParams(document.location.search.substring(1));
+            let username = params.get("username");
+            let code = params.get("code");
+            //TODO validate query params
+            userPool.confirmRegistration(username,code)
+                .then(()=>{
+                    let count = 3;
+                    let modalContentsElem = document.querySelector(".modal-userfeedback-contents");
+                    
+                    let countDown = ()=>{
+                        if(count > 0){
+                            let elem = document.createElement("p");
+                            elem.innerText = count+"...";
+                            modalContentsElem.appendChild(elem)
+                        }
+                        else if(count === 0){
+                            clearInterval(intervalId);
+                            window.location.href = "/login.html";
+                            return;
+                        }
+                        count --;
+                    };
+                    countDown();
+                    let intervalId = setInterval(countDown,1000);
+                })
+                .catch(e=>{
+                    Larry.ui.userFeedback.displayErrorMessage("Unknown Error",`<pre>${JSON.stringify(e,null,'\t')}</pre>`);
+                })
+            /**************************************************************************************/
+            /*START RENDER METHODS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END RENDER METHODS */
+            /*START HANDLER METHODS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END HANDLER METHODS */
+            /*START EVENT LISTENERS */
+            /**************************************************************************************/
+            
+            /**************************************************************************************/
+            /*END EVENT LISTENERS */
+            /**************************************************************************************/
+        });
+    </script>
+</body>
+</html>
